@@ -1,0 +1,135 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NV-Disruptron contributors
+# SPDX-License-Identifier: Apache-2.0
+#
+# NV-Disruptron replication manifest — machine-readable stack definition.
+# Used by bootstrap/verify scripts and documentation.
+
+schema_version: 1
+project: NV-Disruptron-Gyana
+snapshot_date: "2026-06-06"
+reference_host:
+  hostname: scan-09
+  platform: dgx-spark
+  gpu: GB10
+  memory_gb: 121
+  arch: aarch64
+  cuda: "13.0"
+  os: Ubuntu 24.04
+
+repo:
+  default_path: "~/NV-Disruptron-Gyana"
+  entry_script: "./scripts/disruptron"
+  replication_kit: "./deploy/replicate"
+
+inference:
+  engine: vllm
+  docker_image: vllm/vllm-openai:v0.20.0-aarch64-cu130-ubuntu2404
+  container_name: vllm-nemotron-omni
+  port: 8000
+  base_url: http://127.0.0.1:8000/v1
+  model_hf: nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-NVFP4
+  served_model_id: nemotron-3-nano-omni  # hyphenated — OpenClaw Nemotron plugin
+  max_model_len: 262144
+  multimodal: true
+  reasoning_parser: nemotron_v3
+  gpu_util_default: 0.89
+  max_num_seqs: 1
+
+openclaw:
+  host_gateway_port: 18789
+  agent_id: disruptron
+  workspace: features/agent/workspace
+  primary_model: vllm/nemotron-3-nano-omni
+  config_path: ~/.openclaw/openclaw.json
+  systemd_unit: openclaw-gateway.service
+  mcp_servers:
+    - id: disruptron_ops
+      type: stdio
+      source: platform/mcp/ops
+    - id: google_calendar
+      type: streamable-http
+      url: http://127.0.0.1:3000
+  channels:
+    telegram:
+      bot_username: nv_disruptron_bot
+      dm_policy: pairing
+      streaming_mode: partial
+
+nemoclaw:
+  sandbox_name: disruptron
+  dashboard_port: 18790
+  provider: vllm-local
+  reasoning_env: NEMOCLAW_REASONING=1
+  policies:
+    - npm
+    - pypi
+    - huggingface
+    - brew
+    - local-inference
+    - openclaw-pricing
+    - telegram
+    - google-calendar-mcp
+  policy_files:
+    - platform/nemoclaw/policies/google-calendar-mcp.yaml
+  sandbox_mcp:
+    google_calendar: http://host.openshell.internal:3000
+
+google_calendar_mcp:
+  package: "@cocal/google-calendar-mcp"
+  install_dir: ~/google-calendar-mcp
+  port: 3000
+  transport: http
+  tokens_path: ~/.config/google-calendar-mcp/tokens.json
+  start_command: "node build/index.js --transport http --port 3000 --host 0.0.0.0"
+
+context_api:
+  port: 8010
+  db_path: data/disruptron_context.db
+
+token_budget:
+  context_window: 262144
+  reserve_tokens: ~20971
+  keep_recent_tokens: ~26214
+  memory_flush_soft_threshold: 8000
+  tool_result_max_chars: 12000
+  recall_max_chars: 6000
+  calculator: platform/shared/token_budget.py
+
+env_required:
+  - ELEVENLABS_API_KEY
+
+env_recommended:
+  - VLLM_MULTIMODAL=1
+  - VLLM_MAX_MODEL_LEN=262144
+  - DISRUPTRON_CONTEXT_WINDOW=262144
+  - VLLM_SERVED_MODEL=nemotron-3-nano-omni
+  - NEMOCLAW_REASONING=1
+  - TELEGRAM_BOT_TOKEN
+  - DISRUPTRON_GOOGLE_CALENDAR=1
+
+bootstrap_sequence:
+  - deploy/replicate/scripts/bootstrap-device.sh
+  - scripts/disruptron vllm
+  - scripts/disruptron configure --channels
+  - openclaw gateway restart
+  - scripts/disruptron nemoclaw onboard
+  - scripts/disruptron nemoclaw policy-setup --tunnel
+  - scripts/disruptron nemoclaw recover
+  - deploy/replicate/scripts/verify-device.sh
+
+verify_endpoints:
+  - url: http://127.0.0.1:8000/v1/models
+    expect_json: ".data[0].id"
+  - url: http://127.0.0.1:18789/
+    expect_http: 200
+  - url: http://127.0.0.1:3000/health
+    optional: true
+  - url: http://127.0.0.1:8010/v1/context/health
+    optional: true
+
+skills:
+  - disruptron-ops
+  - disruptron-investigation
+  - disruptron-token-budget
+  - disruptron-multi-tool-analysis
+  - disruptron-context-memory

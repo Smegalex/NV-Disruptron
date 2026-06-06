@@ -16,6 +16,8 @@ source "$_DISRUPTRON_LIB/lib/research.sh"
 source "$_DISRUPTRON_LIB/lib/configure.sh"
 # shellcheck source=../platform/scripts-lib/lib/calendar.sh
 source "$_DISRUPTRON_LIB/lib/calendar.sh"
+# shellcheck source=../platform/scripts-lib/lib/token_budget.sh
+source "$_DISRUPTRON_LIB/lib/token_budget.sh"
 # shellcheck source=../platform/scripts-lib/lib/observability.sh
 source "$_DISRUPTRON_LIB/lib/observability.sh"
 # shellcheck source=../platform/scripts-lib/lib/test.sh
@@ -46,6 +48,7 @@ Agent:
   configure [--channels]   Register MCP + OpenClaw agent + TTS
   nemoclaw onboard|profile|policy-setup|recover|url|status   NVIDIA NemoClaw + Nemotron Omni
   calendar start|stop|ensure|status   Google Calendar MCP (host :3000)
+  token-budget status|export            Computed OpenClaw compaction budgets
 
 Infrastructure:
   vllm [--recreate] [--llama]   Start Nemotron on :8000
@@ -88,6 +91,7 @@ main() {
     context) disruptron_cmd_context "$@" ;;
     nemoclaw) disruptron_cmd_nemoclaw "$@" ;;
     calendar) disruptron_cmd_calendar "$@" ;;
+    token-budget) disruptron_cmd_token_budget "$@" ;;
     elevenlabs) disruptron_cmd_elevenlabs "$@" ;;
     install) disruptron_cmd_install "$@" ;;
     *)

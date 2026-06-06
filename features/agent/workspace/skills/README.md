@@ -14,6 +14,8 @@ openclaw skills list
 | Skill | Use when |
 |-------|----------|
 | [disruptron-ops](disruptron-ops/SKILL.md) | **Default orchestrator** — broad London status |
+| [disruptron-investigation](disruptron-investigation/SKILL.md) | **Vague / open-ended** — multi-tool investigations |
+| [disruptron-token-budget](disruptron-token-budget/SKILL.md) | Context window discipline during tool chains |
 | [disruptron-proactive-alert](disruptron-proactive-alert/SKILL.md) | Heartbeat alerts on material changes |
 | [disruptron-ev-companion](disruptron-ev-companion/SKILL.md) | EV charging personalized to USER.md |
 | [disruptron-voice](disruptron-voice/SKILL.md) | Talk Mode / spoken replies (VOICE.md) |

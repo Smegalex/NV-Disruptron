@@ -14,6 +14,8 @@ Single map for all NV-Disruptron docs.
 | Navigate the repo tree | [STRUCTURE.md](STRUCTURE.md) |
 | Develop / add tools | [DEVELOPMENT.md](DEVELOPMENT.md) |
 | Avoid context overflow | [CONTEXT.md](CONTEXT.md) |
+| **Full stack snapshot (models, gateways, setup)** | [OPERATIONS.md](OPERATIONS.md) |
+| **Replicate stack on another device** | [deploy/replicate/README.md](../deploy/replicate/README.md) |
 | NemoClaw + Nemotron Omni | [NEMOCLAW.md](NEMOCLAW.md) |
 | Look up MCP tools | [MCP.md](MCP.md) |
 | MCP server layout | [platform/mcp/README.md](../platform/mcp/README.md) |

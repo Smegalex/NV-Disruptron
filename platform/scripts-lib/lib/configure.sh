@@ -111,7 +111,9 @@ EOF
   fi
 
   echo "==> Patching OpenClaw: disruptron agent + ElevenLabs TTS + heartbeat"
-  python3 - <<'PY' "$openclaw_config" "$workspace" "$vllm_model" "$slim_mcp" "$root" "$heartbeat_every" "$reasoning_on"
+  local budget_json
+  budget_json="$(PYTHONPATH="$root/platform/shared${PYTHONPATH:+:$PYTHONPATH}" python3 -m token_budget)"
+  python3 - <<'PY' "$openclaw_config" "$workspace" "$vllm_model" "$slim_mcp" "$root" "$heartbeat_every" "$reasoning_on" "$budget_json"
 import json
 import os
 import sys
@@ -124,6 +126,7 @@ slim = sys.argv[4].lower() == "true"
 root = sys.argv[5]
 heartbeat_every = sys.argv[6]
 reasoning_on = sys.argv[7].lower() in ("1", "true", "yes", "on")
+budget = json.loads(sys.argv[8])
 primary = f"vllm/{model_id}"
 eleven_key = os.environ.get("ELEVENLABS_API_KEY") or os.environ.get("XI_API_KEY")
 voice_id = os.environ.get("ELEVENLABS_VOICE_ID", "pMsXgVXv3BLzUgSXRplE")
@@ -222,17 +225,13 @@ plugins.setdefault("entries", {})["browser"] = {"enabled": True}
 
 agents_defaults = cfg.setdefault("agents", {}).setdefault("defaults", {})
 
-context_window = int(
-    os.environ.get(
-        "DISRUPTRON_CONTEXT_WINDOW",
-        os.environ.get("VLLM_MAX_MODEL_LEN", "262144"),
-    )
-)
-max_output_tokens = int(os.environ.get("DISRUPTRON_MAX_OUTPUT_TOKENS", "4096"))
+context_window = int(budget["context_window"])
+max_output_tokens = int(budget["max_output_tokens"])
 
+agents_defaults["contextTokens"] = context_window
 agents_defaults["imageMaxDimensionPx"] = int(os.environ.get("DISRUPTRON_IMAGE_MAX_PX", "768"))
-agents_defaults["bootstrapMaxChars"] = int(os.environ.get("DISRUPTRON_BOOTSTRAP_MAX_CHARS", "4000"))
-agents_defaults["bootstrapTotalMaxChars"] = int(os.environ.get("DISRUPTRON_BOOTSTRAP_TOTAL_MAX_CHARS", "12000"))
+agents_defaults["bootstrapMaxChars"] = int(budget["bootstrap_max_chars"])
+agents_defaults["bootstrapTotalMaxChars"] = int(budget["bootstrap_total_max_chars"])
 agents_defaults["startupContext"] = {
     "enabled": True,
     "applyOn": ["new", "reset"],
@@ -241,8 +240,8 @@ agents_defaults["startupContext"] = {
     "maxTotalChars": int(os.environ.get("DISRUPTRON_STARTUP_MEMORY_TOTAL_CHARS", "1600")),
 }
 agents_defaults["contextLimits"] = {
-    "toolResultMaxChars": int(os.environ.get("DISRUPTRON_TOOL_RESULT_MAX_CHARS", "6000")),
-    "postCompactionMaxChars": int(os.environ.get("DISRUPTRON_POST_COMPACTION_MAX_CHARS", "2000")),
+    "toolResultMaxChars": int(budget["tool_result_max_chars"]),
+    "postCompactionMaxChars": int(budget["post_compaction_max_chars"]),
     "memoryGetMaxChars": int(os.environ.get("DISRUPTRON_MEMORY_GET_MAX_CHARS", "4000")),
     "memoryGetDefaultLines": int(os.environ.get("DISRUPTRON_MEMORY_GET_LINES", "80")),
 }
@@ -250,9 +249,9 @@ agents_defaults["contextPruning"] = {
     "mode": "cache-ttl",
     "ttl": os.environ.get("DISRUPTRON_CONTEXT_PRUNE_TTL", "10m"),
     "keepLastAssistants": int(os.environ.get("DISRUPTRON_CONTEXT_PRUNE_KEEP_ASSISTANTS", "2")),
-    "minPrunableToolChars": int(os.environ.get("DISRUPTRON_CONTEXT_PRUNE_MIN_CHARS", "8000")),
+    "minPrunableToolChars": int(budget["context_prune_min_tool_chars"]),
     "softTrim": {
-        "maxChars": int(os.environ.get("DISRUPTRON_CONTEXT_SOFT_TRIM_MAX", "3000")),
+        "maxChars": int(budget["context_soft_trim_max_chars"]),
         "headChars": 1200,
         "tailChars": 1200,
     },
@@ -263,16 +262,17 @@ agents_defaults["contextPruning"] = {
 }
 agents_defaults["compaction"] = {
     "mode": "safeguard",
-    "reserveTokensFloor": 0,
-    "reserveTokens": int(os.environ.get("DISRUPTRON_COMPACTION_RESERVE_TOKENS", "4096")),
-    "keepRecentTokens": int(os.environ.get("DISRUPTRON_COMPACTION_KEEP_RECENT", "8192")),
-    "maxHistoryShare": float(os.environ.get("DISRUPTRON_COMPACTION_MAX_HISTORY_SHARE", "0.55")),
+    "reserveTokensFloor": int(budget["reserve_tokens_floor"]),
+    "reserveTokens": int(budget["reserve_tokens"]),
+    "keepRecentTokens": int(budget["keep_recent_tokens"]),
+    "maxHistoryShare": float(budget["max_history_share"]),
     "truncateAfterCompaction": True,
     "notifyUser": True,
     "midTurnPrecheck": {"enabled": True},
+    "maxActiveTranscriptBytes": int(budget["max_active_transcript_bytes"]),
     "memoryFlush": {
         "enabled": True,
-        "softThresholdTokens": int(os.environ.get("DISRUPTRON_MEMORY_FLUSH_THRESHOLD", "4000")),
+        "softThresholdTokens": int(budget["memory_flush_soft_threshold"]),
         "prompt": (
             "Session nearing compaction. Persist durable London mobility facts to "
             "memory/YYYY-MM-DD.md (detail) and MEMORY.md (compact index). Include stress "
@@ -282,12 +282,14 @@ agents_defaults["compaction"] = {
     },
     "customInstructions": (
         "Preserve TfL line names, ward/equity scores, EV availability ratios, stress scores, "
-        "and recommended next investigations. Drop raw JSON blobs and duplicate tool output."
+        "tool routing decisions, and recommended next investigations. Drop raw JSON blobs and "
+        "duplicate tool output. Keep the investigation playbook: hypotheses, evidence sources, "
+        "and confidence/gaps when summarizing."
     ),
 }
 
 cfg.setdefault("skills", {}).setdefault("limits", {})["maxSkillsPromptChars"] = int(
-    os.environ.get("DISRUPTRON_MAX_SKILLS_PROMPT_CHARS", "2500")
+    budget["max_skills_prompt_chars"]
 )
 session_cfg = cfg.setdefault("session", {})
 session_cfg.setdefault("reset", {})["idleMinutes"] = int(
@@ -365,6 +367,10 @@ print(f"  stt:        {'elevenlabs scribe_v2' if eleven_key else 'disabled'}")
 print(f"  browser:    enabled (profile openclaw)")
 print(f"  vision:     {modalities}")
 print(f"  context:    window={context_window} maxOut={max_output_tokens} compaction=safeguard prune=on")
+print(
+    f"  tokenBudget: reserve={budget['reserve_tokens']} keepRecent={budget['keep_recent_tokens']} "
+    f"flush@{budget['memory_flush_trigger_tokens']} toolMaxChars={budget['tool_result_max_chars']}"
+)
 print(f"  reasoning:  {'on' if reasoning_on else 'off'} thinkingDefault={cfg['agents']['defaults'].get('thinkingDefault')}")
 print(f"  mcp:        {'disruptron_ops (slim)' if slim else 'full catalog'}")
 PY

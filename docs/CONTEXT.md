@@ -36,6 +36,47 @@ flowchart TB
 | `/context list` | Show what's consuming tokens |
 | `/status` | Context usage + compaction count |
 
+## Token budgeting (OpenClaw compaction model)
+
+OpenClaw treats the **context window** as a fixed token budget. Everything counts: system prompt, tool JSON schemas, skills list, history, and tool results.
+
+| Trigger | When |
+|---------|------|
+| **Auto-compaction** | Estimated usage > `contextWindow - max(reserveTokens, reserveTokensFloor)` |
+| **Memory flush** | Usage > `contextWindow - effectiveReserve - softThresholdTokens` |
+| **Session pruning** | Trims old tool results in-memory before each LLM call (transcript preserved on disk) |
+
+NV-Disruptron **computes** these knobs from `DISRUPTRON_CONTEXT_WINDOW` (default 262144):
+
+```bash
+./scripts/disruptron token-budget status
+./scripts/disruptron configure && openclaw gateway restart
+```
+
+Inspect live usage in chat: **`/status`**, **`/context list`**, **`/context detail`**.
+
+### Computed defaults (256k window)
+
+| Knob | Typical value | Purpose |
+|------|---------------|---------|
+| `reserveTokens` | ~16k | Headroom before compaction |
+| `keepRecentTokens` | ~26k | Recent tail preserved in summaries |
+| `memoryFlush.softThresholdTokens` | 8000 | Early flush before compaction |
+| `toolResultMaxChars` | ~12k | Cap per live tool result |
+| `recall_max_chars` (MCP) | ~6k | SQLite cross-session recall |
+
+### Override env (optional)
+
+```bash
+DISRUPTRON_RESERVE_TOKENS_RATIO=0.08
+DISRUPTRON_KEEP_RECENT_RATIO=0.10
+DISRUPTRON_COMPACTION_RESERVE_FLOOR=0      # OpenClaw default floor is 20k; we set 0 for 256k
+DISRUPTRON_MEMORY_FLUSH_THRESHOLD=8000
+DISRUPTRON_MAX_ACTIVE_TRANSCRIPT_MB=24
+```
+
+Agent skill: `disruptron-token-budget` — summarize tool JSON, use `/compact` under pressure.
+
 ## Environment knobs (`.env`)
 
 ```bash
@@ -49,10 +90,11 @@ DISRUPTRON_MAX_OUTPUT_TOKENS=4096
 # VLLM_GPU_UTIL=0.55
 # VLLM_MAX_NUM_SEQS=2
 
-# Compaction
-DISRUPTRON_COMPACTION_RESERVE_TOKENS=4096
-DISRUPTRON_COMPACTION_KEEP_RECENT=8192
-DISRUPTRON_COMPACTION_MAX_HISTORY_SHARE=0.55
+# Compaction (auto-calculated by ./scripts/disruptron token-budget status)
+# DISRUPTRON_COMPACTION_RESERVE_FLOOR=0
+# DISRUPTRON_MEMORY_FLUSH_THRESHOLD=8000
+# DISRUPTRON_KEEP_RECENT_RATIO=0.10
+# DISRUPTRON_MAX_ACTIVE_TRANSCRIPT_MB=24
 
 # Tool + bootstrap caps
 DISRUPTRON_TOOL_RESULT_MAX_CHARS=6000

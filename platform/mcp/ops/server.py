@@ -101,6 +101,7 @@ async def get_disruptron_ops_health() -> dict:
     from disruptron_agent_policy import (  # noqa: PLC0415
         MAX_AGENT_STEPS_PER_TURN,
         MAX_SAME_TOOL_CALLS_PER_TURN,
+        RECALL_MAX_CHARS,
     )
 
     try:
@@ -121,6 +122,7 @@ async def get_disruptron_ops_health() -> dict:
         "policy": {
             "max_steps_per_turn": MAX_AGENT_STEPS_PER_TURN,
             "max_same_tool_calls": MAX_SAME_TOOL_CALLS_PER_TURN,
+            "recall_max_chars": RECALL_MAX_CHARS,
         },
         "tools_exposed": 12,
     }
@@ -130,13 +132,15 @@ async def get_disruptron_ops_health() -> dict:
 def recall_conversation_context(
     channel: str = "browser",
     chat_id: str = "main",
-    max_chars: int = 2400,
+    max_chars: int | None = None,
 ) -> dict:
     """Load compact SQLite recall (messages, facts, compaction) for continuing a chat without blowing context."""
     from context_store import ContextStore  # noqa: PLC0415
+    from disruptron_agent_policy import RECALL_MAX_CHARS  # noqa: PLC0415
 
+    limit = max_chars if max_chars is not None else RECALL_MAX_CHARS
     db = ROOT / "data" / "disruptron_context.db"
-    return ContextStore(db).recall(channel=channel, external_chat_id=chat_id, max_chars=max_chars)
+    return ContextStore(db).recall(channel=channel, external_chat_id=chat_id, max_chars=limit)
 
 
 @mcp.tool()

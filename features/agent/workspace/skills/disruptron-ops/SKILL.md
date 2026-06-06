@@ -3,7 +3,8 @@ name: disruptron-ops
 description: >-
   Primary orchestrator for autonomous London urban ops. Routes broad or ambiguous
   queries to the right NV-Disruptron skill and MCP tools. Use first for "how's London",
-  hackathon demos, or any question spanning tube, roads, EV, and equity.
+  hackathon demos, or any question spanning tube, roads, EV, and equity. For vague or
+  underspecified user input, delegate immediately to disruptron-investigation.
 ---
 
 # NV-Disruptron ops (orchestrator)
@@ -11,13 +12,14 @@ description: >-
 ## When to activate
 
 - Broad or multi-domain London ops questions
-- User intent unclear — route to a specialist skill after briefing
-- Default entry point when no narrower skill matches
+- User intent unclear — **hand off to `disruptron-investigation`** after briefing (or instead of guessing)
+- Default entry when no narrower skill matches
 
 ## Specialist skills (delegate after orient)
 
 | Domain | Skill | Trigger |
 |--------|-------|---------|
+| **Vague / fuzzy input** | `disruptron-investigation` | short msg, "what's up", trip planning without details |
 | Watch / heartbeat | `disruptron-monitor` | monitor, watch, what changed |
 | Tube / rail | `disruptron-tube` | named line, delays, closures |
 | Roads / streets | `disruptron-roads` | congestion, A-roads, street works |
